@@ -49,28 +49,28 @@ namespace Papercut.Message
             _logger = logger;
         }
 
-        public void HandleReceived(string messageData, [CanBeNull] IList<string> recipients)
+        public void HandleReceived(string messageData, [CanBeNull] string[] recipients, Encoding connectionEncoding)
         {
             string file;
 
-            using (var ms = new MemoryStream(Encoding.UTF8.GetBytes(messageData)))
+            using (var ms = new MemoryStream(connectionEncoding.GetBytes(messageData)))
             {
                 var message = MimeMessage.Load(ParserOptions.Default, ms, true);
 
-                var lookup = recipients.Distinct(StringComparer.CurrentCultureIgnoreCase).IfNullEmpty().ToDictionary(s => s, s => s, StringComparer.OrdinalIgnoreCase);
+                var lookup = recipients.ToHashSet(StringComparer.CurrentCultureIgnoreCase);
 
                 // remove TO:
-                lookup.RemoveRange(message.To.Mailboxes.Select(s => s.Address));
+                lookup.ExceptWith(message.To.Mailboxes.Select(s => s.Address));
 
                 // remove CC:
-                lookup.RemoveRange(message.Cc.Mailboxes.Select(s => s.Address));
+                lookup.ExceptWith(message.Cc.Mailboxes.Select(s => s.Address));
 
                 if (lookup.Any())
                 {
                     // Bcc is remaining, add to message
                     foreach (var r in lookup)
                     {
-                        message.Bcc.Add(MailboxAddress.Parse(r.Key));
+                        message.Bcc.Add(MailboxAddress.Parse(r));
                     }
                 }
 
